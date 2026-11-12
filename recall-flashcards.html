@@ -50,6 +50,7 @@ table{width:100%;border-collapse:collapse}
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--bd);vertical-align:top}
 th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
 .e-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,420px);gap:18px;align-items:start}.e-form{min-width:0}
+.e-head{position:sticky;top:-20px;background:var(--card);padding:14px 0 8px;margin-top:-14px;z-index:7;align-items:center;gap:8px}.e-pv{top:56px!important}
 .e-pv{position:sticky;top:0;max-height:calc(100vh - 120px);overflow:auto;border:1px solid var(--bd);border-radius:10px;padding:10px}
 @media(max-width:1000px){.e-grid{grid-template-columns:minmax(0,1fr)}.e-pv{position:static;max-height:none}}
 @media(min-width:1101px){.mgrid:not(.nopv) .mlist th:nth-child(4),.mgrid:not(.nopv) .mlist td:nth-child(4),.mgrid:not(.nopv) .mlist th:nth-child(8),.mgrid:not(.nopv) .mlist td:nth-child(8){display:none}}
@@ -179,6 +180,7 @@ body.exam-run main{max-width:1040px}
 .exring::before{content:"";position:absolute;inset:12px;border-radius:50%;background:var(--card)}.exring b{position:relative;font-size:1.7em}
 .exg{margin-top:12px}.exg>.face{min-height:0;padding:8px 0}.exg-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0}.exg-ans,.exg-sol{background:var(--bg);border-radius:8px;padding:8px 10px;white-space:normal;text-align:left}.exg-sol.face{min-height:0}
 @media(max-width:760px){.exg-cols{grid-template-columns:1fr}}
+.e-multi{font-weight:600;margin-right:12px}.e-multi input{width:18px;height:18px}
 .exsug{margin:6px 0}.exmiss{color:var(--warn)}button.sug{border-color:var(--ac);box-shadow:0 0 0 2px var(--ac) inset}
 .exgbar{height:10px;background:var(--bd);border-radius:6px;overflow:hidden}.exgbar i{display:block;height:100%}.exgbar i.p{background:var(--ok)}.exgbar i.f{background:var(--bad)}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
@@ -1491,7 +1493,7 @@ function renderManage(){
   const sortOpts=[['upd','Sortierung: zuletzt geändert'],['due','Fälligkeit: früheste zuerst'],['duedesc','Fälligkeit: späteste zuerst'],['front','Vorderseite A–Z'],['created','Zuletzt erstellt'],['ease','Ease: niedrigste zuerst'],['lapses','Meiste Fehler zuerst']];
   $('#v-manage').innerHTML=`<div class="box">
     <div class="flex"><h2 class="grow" style="margin:0">${t('Verwaltung')} <span class="mut small">${t('({0} von {1} Karten)',list.length,S.cards.size)}</span></h2>
-      <label class="inl" title="${esc(t('Kartenvorschau neben der Liste ein-/ausblenden'))}"><input type="checkbox" id="m-pvtoggle" ${pvOn?'checked':''}> 👁 ${t('Vorschau')}</label><button data-a="fr">${t('Suchen & Ersetzen')}</button><button data-a="dup">${t('Dubletten')}</button><button data-a="prt">${t('Drucken')}</button><button data-a="mod">${t('Kartenvorlagen')}</button><button id="m-newdeck">${t('+ Stapel')}</button><button class="pri" id="m-new">${t('+ Neue Karte')}</button></div>
+      <label class="inl" title="${esc(t('Kartenvorschau neben der Liste ein-/ausblenden'))}"><input type="checkbox" id="m-pvtoggle" ${pvOn?'checked':''}> 👁 ${t('Vorschau')}</label><button data-a="fr">${t('Suchen & Ersetzen')}</button><button data-a="dup">${t('Dubletten')}</button><button data-a="prt">${t('Drucken')}</button><button data-a="mod">${t('Kartenvorlagen')}</button><button id="m-bulk" title="${esc(t('Mehrere Karten aus Excel/Calc einfügen'))}">📋 ${t('Aus Tabelle')}</button><button id="m-newdeck">${t('+ Stapel')}</button><button class="pri" id="m-new">${t('+ Neue Karte')}</button></div>
     <div class="flex" style="margin-top:12px">
       <input id="m-q" placeholder="${esc(t('Suchen…'))}" value="${esc(MF.q)}" style="min-width:260px;flex:1">
       <select id="m-deck" class="m-deck-narrow">${deckOpts(MF.deck,true)}</select>
@@ -1528,6 +1530,7 @@ function renderManage(){
     else if(a==='ren'){const n=prompt(t('Neuer Name:'),d.name);if(n&&n.trim()&&norm(n)!==norm(d.name)){await renameDeck(id,n.trim());rr()}}
     else if(a==='del'){const ids=deckIdsUnder(id),idset=new Set(ids),cs=[...S.cards.values()].filter(c=>idset.has(c.deck));
       if(confirm(t('Stapel „{0}“ mit {1} Karten (inkl. Unterstapel) endgültig löschen?',d.name,cs.length))){await snapshot(t('Vor Löschen eines Stapels'));await deleteCards(cs.map(c=>c.id));await commit({},{decks:ids});MF.deck='';rr()}}});
+  $('#m-bulk').onclick=()=>openBulkAdd(MF.deck||null,rr);
   $('#m-newdeck').onclick=()=>openNewDeck(MF.deck||null);
   $('#m-new').onclick=()=>openEditor(null,MF.deck||null,rr);
   $('#m-all').onchange=e=>{shown.forEach(c=>e.target.checked?MF.sel.add(c.id):MF.sel.delete(c.id));rr()};
@@ -2062,7 +2065,10 @@ const optRowsHTML=src=>{const o=parseOptions(src);while(o.length<4)o.push({text:
 async function openEditor(cardId,deckId,done){
   const c0=cardId?S.cards.get(cardId):null;
   const nc=c0?noteCards(c0.noteId):[];
-  const E={type:c0?c0.type:'basic',deck:c0?c0.deck:(deckId||[...S.decks.keys()][0]||''),fields:c0?{...c0.fields}:{},tags:c0?[...(c0.tags||[])]:[],
+  const LN=S.settings.lastNew||{},nextTags=null;
+  const lnType=!c0&&LN.type&&(TYPES.includes(LN.type)||modelOf(LN.type))?LN.type:'basic';
+  const lnDeck=!c0&&LN.deck&&[...S.decks.values()].some(x=>x.name===LN.deck)?[...S.decks.values()].find(x=>x.name===LN.deck).id:'';
+  const E={type:c0?c0.type:lnType,deck:c0?c0.deck:(deckId||lnDeck||[...S.decks.keys()][0]||''),fields:c0?{...c0.fields}:{},tags:c0?[...(c0.tags||[])]:(nextTags||[]),multi:!c0,multiN:0,
     atts:c0?(c0.atts||[]).map(a=>({...a})):[],note:c0?.note||'',pending:new Map(),urls:new Map()};
   E.fields.masks=(E.fields.masks||[]).map(m=>[...m]);
   let deckName=E.deck&&S.decks.get(E.deck)?S.decks.get(E.deck).name:'';
@@ -2072,6 +2078,7 @@ async function openEditor(cardId,deckId,done){
     for(const f of fieldDefsOf()){const el=$('#'+f.id,d);if(el)E.fields[f.key]=el.value}
     const tg=$('#e-tags',d);if(tg)E.tags=tg.value.split(/[,\s]+/).filter(Boolean);
     const n=$('#e-note',d);if(n)E.note=n.value;
+    const mu=$('#e-multi',d);if(mu)E.multi=mu.checked;
   };
   const urlOf=async a=>E.urls.get(a.id)||(E.pending.has(a.id)?(E.urls.set(a.id,URL.createObjectURL(E.pending.get(a.id).blob)),E.urls.get(a.id)):await mediaUrl(a.id));
   const fieldDefsOf=()=>{const m=modelOf(E.type);
@@ -2079,7 +2086,21 @@ async function openEditor(cardId,deckId,done){
       {id:'e-extra',key:'extra',label:t(fieldDefs.extra[0]),rows:2},{id:'e-source',key:'source',label:t(fieldDefs.source[0]),rows:1}]};
   let rec=null;
   const addFile=async(blob0,name)=>{const id=uid(),type=blob0.type||guessType(name),blob=S.settings.shrink===false?blob0:await shrinkImage(blob0);E.atts.push({id,name,type,size:blob.size,osize:blob.size!==blob0.size?blob0.size:undefined,side:'back'});E.pending.set(id,{id,blob,name,type,size:blob.size})};
-  d.addEventListener('paste',async e=>{const its=[...(e.clipboardData?.items||[])].filter(i=>i.type.startsWith('image/'));if(!its.length)return;e.preventDefault();grab();
+  const cleanPaste=x=>{let v=String(x).replace(/\r\n?/g,'\n').replace(/ /g,' ');
+    if(/\n$/.test(v))v=v.replace(/\n$/,'');                         // Excel hängt an eine Zelle einen Zeilenumbruch an
+    if(v.length>1&&v[0]==='"'&&v.endsWith('"')&&(/\n/.test(v)||/""/.test(v)))v=v.slice(1,-1).replace(/""/g,'"'); // Excel setzt Zellen mit Umbruch/Anführungszeichen in "…"
+    return v.replace(/\t/g,' ')};
+  d.addEventListener('paste',async e=>{
+    const cd=e.clipboardData;if(!cd)return;
+    const txt=cd.getData('text/plain'),tg=e.target;
+    // Text hat Vorrang: Excel & Co. legen zusätzlich ein Bild der Zelle in die Zwischenablage – das soll nicht als Anhang landen
+    if(txt&&txt.trim()&&tg&&(tg.tagName==='TEXTAREA'||(tg.tagName==='INPUT'&&/^(text|search|)$/.test(tg.type)))){
+      e.preventDefault();const v=cleanPaste(txt);
+      if(!(document.execCommand&&document.execCommand('insertText',false,v))){const s0=tg.selectionStart??tg.value.length,e0=tg.selectionEnd??s0;tg.setRangeText(v,s0,e0,'end');tg.dispatchEvent(new Event('input',{bubbles:true}))}
+      return}
+    const its=[...(cd.items||[])].filter(i=>i.type.startsWith('image/'));if(!its.length)return;
+    if(txt&&txt.trim())return; // Text außerhalb eines Feldes: nichts als Bild anhängen
+    e.preventDefault();grab();
     let i=0;for(const it of its){const f=it.getAsFile();await addFile(f,'bild-'+stamp()+(i++?'-'+i:'')+'.'+(f.type.split('/')[1]||'png').replace('jpeg','jpg'))}draw()});
   async function toggleRec(){
     if(rec){rec.stop();return}
@@ -2111,7 +2132,7 @@ async function openEditor(cardId,deckId,done){
   function draw(){
     const defs=fieldDefsOf();
     const hist=c0?S.log.filter(e=>nc.some(x=>x.id===e.card)).slice(-30).reverse():[];
-    d.innerHTML=`<div class="flex"><h2 class="grow" style="margin:0">${c0?t('Karte bearbeiten'):t('Neue Karte')}</h2><label class="inl e-pvtoggle" title="${esc(t('Kartenvorschau ein-/ausblenden'))}"><input type="checkbox" id="e-pvon" ${S.settings.pvEd!==false?'checked':''}> 👁 ${t('Vorschau')}</label></div>
+    d.innerHTML=`<div class="flex e-head"><h2 class="grow" style="margin:0">${c0?t('Karte bearbeiten'):t('Neue Karte')}</h2>${c0?'':`${E.multiN?`<span class="chip" role="status" aria-live="polite">✓ ${t('{0} angelegt',E.multiN)}</span>`:''}`}<label class="inl e-pvtoggle" title="${esc(t('Kartenvorschau ein-/ausblenden'))}"><input type="checkbox" id="e-pvon" ${S.settings.pvEd!==false?'checked':''}> 👁 ${t('Vorschau')}</label>${c0?`<button class="bad" id="e-del">${t('Löschen')}</button>`:''}<button id="e-cancel">${c0?t('Abbrechen'):t('Schließen')}</button><button class="pri" id="e-save">${t('Speichern')}</button></div><div class="warn" id="e-err" role="alert" style="min-height:0"></div>
     <div class="e-grid ${S.settings.pvEd!==false?'':'nopv'}"><div class="e-form">
     <div class="flex"><div><label>${t('Kartentyp')}</label><select id="e-type">${[...TYPES,...models().map(m=>'m:'+m.id)].map(x=>`<option value="${x}" ${E.type===x?'selected':''}>${esc(typeLabel(x))}</option>`).join('')}</select> <button class="sm" id="e-models" title="${esc(t('Kartenvorlagen'))}">⚙</button></div>
       <div class="grow"><label>${t('Stapel')}</label><input id="e-deck" list="e-decks" value="${esc(deckName||'')}" style="width:100%" placeholder="${esc(t('Stapel::Unterstapel'))}"><datalist id="e-decks">${[...S.decks.values()].map(x=>`<option value="${esc(x.name)}">`).join('')}</datalist></div></div>
@@ -2131,8 +2152,7 @@ async function openEditor(cardId,deckId,done){
       <div class="flex" style="margin-top:6px"><input type="file" id="e-file" multiple><button class="sm" id="e-rec">🎤 ${t('Aufnehmen')}</button></div><div class="small mut">${t('Tipp: Bilder mit Strg+V aus der Zwischenablage einfügen.')}</div></div>
     ${hist.length?`<details style="margin-top:10px"><summary>${t('Kartenverlauf')} (${hist.length})</summary><table>${hist.map(e=>`<tr><td>${new Date(e.ts).toLocaleString(LOC())}</td><td>${[t('Nochmal'),t('Schwer'),t('Gut'),t('Leicht')][e.r-1]||e.r}</td><td class="mut">${e.kind||''}</td><td class="mut">${e.ivb||0} → ${e.iva||0} ${t('T')}</td></tr>`).join('')}</table></details>`:''}
     </div><aside class="e-pv" aria-label="${esc(t('Kartenvorschau (live)'))}"><div class="small"><b>${t('Kartenvorschau (live)')}</b></div><div id="e-pvtabs" class="flex" style="margin:6px 0"></div><div id="e-card" aria-live="polite"></div></aside></div>
-    <div class="flex" style="margin-top:16px;justify-content:flex-end"><span class="warn grow" id="e-err"></span>
-      ${c0?`<button class="bad" id="e-del">${t('Löschen')}</button>`:''}<button id="e-cancel">${t('Abbrechen')}</button><button class="pri" id="e-save">${t('Speichern')}</button></div>`;
+    `;
     $('#e-type',d).onchange=e=>{grab();E.type=e.target.value;draw()};
     $('#e-cancel',d).onclick=()=>d.guardClose();
     $('#e-rec',d).onclick=toggleRec;$('#e-models',d).onclick=()=>{grab();openModels();};
@@ -2143,7 +2163,7 @@ async function openEditor(cardId,deckId,done){
       ta.value=ta.value.slice(0,s)+`{{c${n}::`+ta.value.slice(s,e)+'}}'+ta.value.slice(e);E.fields.text=ta.value};
     if(E.type==='occlusion')drawOcc();
     const del=$('#e-del',d);if(del)del.onclick=async()=>{if(confirm(t('Notiz mit {0} Karte(n) löschen?',nc.length))){await deleteCards(nc.map(x=>x.id));d.close();done&&done()}};
-    $('#e-save',d).onclick=save;
+    $('#e-save',d).onclick=()=>save();
     PV_URLS=E.urls;
     d.style.width=S.settings.pvEd!==false?'min(1180px,96vw)':'min(780px,96vw)';
     $('#e-pvon',d).onchange=e=>{const on=e.target.checked;S.settings.pvEd=on;saveSettings();$('.e-grid',d).classList.toggle('nopv',!on);d.style.width=on?'min(1180px,96vw)':'min(780px,96vw)';if(on)pvSchedule(0)};
@@ -2204,12 +2224,17 @@ async function openEditor(cardId,deckId,done){
     const noteId=c0?c0.noteId:uid();
     await applyNoteUpdates([{noteId,create:true,patch:{type:E.type,deck:dk.id,fields:{...E.fields,...f},tags:E.tags,atts:E.atts.map(({id,name,type,size,osize,side})=>({id,name,type,size,osize,side:side||'back'})),note:E.note.trim()||undefined,created:c0?undefined:Date.now()}}],
       {puts:{media},dels:{media:removed}});
+    if(!c0){S.settings.lastNew={type:E.type,deck:dk.name,multi:!!E.multi};await saveSettings()}
+    if(!c0){ // Mehrfach-Modus: Fenster bleibt offen, Felder leeren
+      E.multiN++;E.fields={};E.atts=[];E.pending=new Map();E.note='';deckName=dk.name;draw();$('#e-err',d).textContent='';
+      d.resetDirty&&d.resetDirty();done&&done();announce(t('Gespeichert')+' ('+E.multiN+')');
+      const first=$('#'+fieldDefsOf()[0].id,d);first&&first.focus();return}
     d.close();toast(t('Gespeichert'));done&&done();
     }catch(e){err(t('Speichern fehlgeschlagen. Bitte erneut versuchen.'));window.__errs.push({ts:Date.now(),m:'Editor: '+String(e?.message||e||'Unbekannter Fehler').slice(0,400)})}
     finally{saving=false;const b=$('#e-save',d);if(b)b.disabled=false}
   }
   draw();
-  {const sig=()=>[...d.querySelectorAll('input:not([type=file]),select,textarea')].filter(x=>!x.closest('#e-card,.e-pvtoggle')).map(x=>x.type==='checkbox'?x.checked:x.value).join('\u0001')+JSON.stringify(E.fields.masks||[])+E.atts.length,base=sig();d.isDirty=()=>sig()!==base}
+  {const sig=()=>[...d.querySelectorAll('input:not([type=file]),select,textarea')].filter(x=>!x.closest('#e-card,.e-pvtoggle')).map(x=>x.type==='checkbox'?x.checked:x.value).join('\u0001')+JSON.stringify(E.fields.masks||[])+E.atts.length;let base=sig();d.isDirty=()=>sig()!==base;d.resetDirty=()=>{base=sig()};d.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();save()}})}
 }
 
 /* ---------- Optionen ---------- */
@@ -2262,6 +2287,86 @@ function openDeckDates(id){
   $('#dd-c',d).onclick=()=>d.close();
   $('#dd-s',d).onclick=async()=>{const nd={...dk,due:$('#dd-due',d).value||null,exam:$('#dd-exam',d).value||null};await commit({decks:[nd]});d.close();go(VIEW)};
 }
+
+/* ---------- Mehrere Karten aus einer Tabelle (Excel/Calc) einfügen ---------- */
+function parseTable(txt){
+  txt=String(txt).replace(/\r\n?/g,'\n').replace(/ /g,' ');
+  const first=txt.split('\n',1)[0],dl=first.includes('\t')?'\t':(first.includes(';')&&!first.includes('\t')?';':'\t');
+  const rows=[];let row=[],cell='',q=false;
+  for(let i=0;i<txt.length;i++){const c=txt[i];
+    if(q){if(c==='"'){if(txt[i+1]==='"'){cell+='"';i++}else q=false}else cell+=c}
+    else if(c==='"'&&cell==='')q=true;
+    else if(c===dl){row.push(cell);cell=''}
+    else if(c==='\n'){row.push(cell);rows.push(row);row=[];cell=''}
+    else cell+=c}
+  if(cell!==''||row.length){row.push(cell);rows.push(row)}
+  return rows.map(r=>r.map(x=>x.trim())).filter(r=>r.some(x=>x));
+}
+const BULK_TYPES=['basic','reversed','typein','cloze','mc'];
+const bulkRoles=ty=>ty==='cloze'?['text','extra','source','tags']:ty==='mc'?['front','options','extra','source','tags']:['front','back','extra','source','tags'];
+const ROLE_LABEL={front:'Vorderseite',back:'Rückseite',text:'Text mit Lücken',options:'Antwortoptionen',extra:'Zusatz',source:'Quelle',tags:'Tags'};
+function openBulkAdd(deckId,done){
+  const LN=S.settings.lastNew||{},dk0=deckId&&S.decks.get(deckId);
+  const d=dlg(`<h2>📋 ${t('Karten aus Tabelle einfügen')}</h2>
+  <p class="small mut" style="margin:0 0 8px">${t('Zellen in Excel/Calc markieren, kopieren (Strg+C) und unten einfügen. Jede Zeile wird eine Karte, jede Spalte ein Feld.')}</p>
+  <div class="flex"><div><label for="bk-type">${t('Kartentyp')}</label><select id="bk-type">${BULK_TYPES.map(x=>`<option value="${x}" ${(LN.type===x)?'selected':''}>${esc(typeLabel(x))}</option>`).join('')}</select></div>
+    <div class="grow"><label for="bk-deck">${t('Stapel')}</label><input id="bk-deck" list="bk-decks" style="width:100%" value="${esc(dk0?dk0.name:(LN.deck||''))}" placeholder="${esc(t('Stapel::Unterstapel'))}"><datalist id="bk-decks">${[...S.decks.values()].map(x=>`<option value="${esc(x.name)}">`).join('')}</datalist></div>
+    <div><label for="bk-tags">${t('Tags für alle (optional)')}</label><input id="bk-tags" style="width:180px"></div></div>
+  <label for="bk-text">${t('Tabelle')}</label><textarea id="bk-text" rows="7" style="width:100%;font-family:monospace;white-space:pre" placeholder="${esc(t('Hier einfügen (Strg+V) …'))}"></textarea>
+  <div class="flex" style="margin-top:6px"><label class="inl"><input type="checkbox" id="bk-head"> ${t('Erste Zeile ist Überschrift')}</label><label class="inl"><input type="checkbox" id="bk-dup" checked> ${t('Doppelte überspringen')}</label></div>
+  <div id="bk-map" style="margin-top:8px"></div><div id="bk-prev" style="margin-top:8px;overflow-x:auto"></div>
+  <div id="bk-info" class="small" role="status" style="margin-top:6px"></div>
+  <div class="flex" style="margin-top:10px;justify-content:flex-end"><button id="bk-c">${t('Abbrechen')}</button><button class="pri" id="bk-ok" disabled>${t('Karten anlegen')}</button></div>`,'min(920px,96vw)');
+  let rows=[],roles=[],head=false;
+  const ty=()=>$('#bk-type',d).value;
+  const nameRole=h=>{const k=nkey(h);if(k==='tags'||k==='tag'||k==='schlagworte'||k==='schlagwort')return 'tags';const a=FIELD_ALIAS[k];return a&&bulkRoles(ty()).includes(a)?a:null};
+  const fieldsOf=r=>{const f={},tags=[];r.forEach((v,i)=>{const ro=roles[i];if(!ro||!v)return;if(ro==='tags')tags.push(...v.split(/[,;\s]+/).filter(Boolean));else f[ro]=f[ro]?f[ro]+'\n'+v:v});return {f,tags}};
+  const check=(type,f)=>{
+    if(type==='cloze')return clozeNums(f.text||'').length?'':t('keine Lücke {{c1::…}}');
+    if(type==='mc'){const o=parseOptions(f.options);return !f.front?t('Frage fehlt'):o.length<2?t('weniger als 2 Optionen'):o.some(x=>x.ok)?'':t('keine richtige Option (*)')}
+    if(type==='typein')return f.front&&f.back?'':t('Vorder- oder Rückseite fehlt');
+    return f.front?'':t('Vorderseite fehlt')};
+  const render=()=>{
+    const type=ty(),rl=bulkRoles(type),data=head?rows.slice(1):rows,n=Math.max(0,...rows.map(r=>r.length));
+    $('#bk-map',d).innerHTML=rows.length?`<div class="small mut">${t('Spalten zuordnen')}</div><div class="flex">${Array.from({length:n},(_,i)=>`<div><label class="small" style="margin:0">${t('Spalte {0}',i+1)}${head&&rows[0][i]?` · <i>${esc(rows[0][i].slice(0,18))}</i>`:''}</label><select data-col="${i}"><option value="">– ${t('ignorieren')} –</option>${rl.map(r=>`<option value="${r}" ${roles[i]===r?'selected':''}>${t(ROLE_LABEL[r])}</option>`).join('')}</select></div>`).join('')}</div>`:'';
+    $$('[data-col]',d).forEach(sel=>sel.onchange=()=>{roles[+sel.dataset.col]=sel.value;render()});
+    const items=data.map(r=>({r,...fieldsOf(r)}));let ok=0,bad=0;const why=new Map();
+    for(const it of items){const e=check(type,it.f);it.err=e;if(e){bad++;why.set(e,(why.get(e)||0)+1)}else ok++}
+    $('#bk-prev',d).innerHTML=items.length?`<table><tr><th>#</th>${rl.filter(x=>x!=='tags'&&roles.includes(x)).map(x=>`<th>${t(ROLE_LABEL[x])}</th>`).join('')}<th></th></tr>${items.slice(0,6).map((it,i)=>`<tr><td class="mut small">${i+1}</td>${rl.filter(x=>x!=='tags'&&roles.includes(x)).map(x=>`<td style="max-width:260px;white-space:pre-wrap">${esc(String(it.f[x]||'').slice(0,140))}</td>`).join('')}<td>${it.err?`<span class="bad small">⚠ ${esc(it.err)}</span>`:'✓'}</td></tr>`).join('')}</table>${items.length>6?`<div class="small mut">… ${t('{0} weitere Zeilen',items.length-6)}</div>`:''}`:'';
+    $('#bk-info',d).innerHTML=items.length?`<b>${t('{0} Karten bereit',ok)}</b>${bad?` · <span class="bad">${t('{0} Zeilen werden übersprungen',bad)}: ${[...why].map(([k,v])=>esc(k)+' ('+v+')').join(', ')}</span>`:''}`:'';
+    $('#bk-ok',d).disabled=!ok;$('#bk-ok',d).textContent=ok?t('{0} Karten anlegen',ok):t('Karten anlegen');
+    d._items=items.filter(i=>!i.err);
+  };
+  const load=()=>{
+    rows=parseTable($('#bk-text',d).value);head=false;roles=[];
+    if(rows.length){const nr=rows[0].map(nameRole);if(nr.filter(Boolean).length>=1&&rows.length>1&&nr.filter(Boolean).length>=Math.ceil(rows[0].length/2)){head=true;roles=nr}
+      if(!head){roles=rows[0].map((_,i)=>bulkRoles(ty())[i]||'')}else{const used=new Set(roles.filter(Boolean));roles=roles.map(r=>r)}}
+    $('#bk-head',d).checked=head;render()};
+  $('#bk-text',d).oninput=load;
+  $('#bk-text',d).addEventListener('paste',e=>{e.stopPropagation()});
+  $('#bk-type',d).onchange=()=>{const rl=bulkRoles(ty());roles=roles.map((r,i)=>rl.includes(r)?r:(head?nameRole(rows[0][i])||'':rl[i]||''));render()};
+  $('#bk-head',d).onchange=e=>{head=e.target.checked;if(head&&rows.length){roles=rows[0].map((h,i)=>nameRole(h)||roles[i]||'')}render()};
+  $('#bk-c',d).onclick=()=>d.close();
+  let busy=false;
+  $('#bk-ok',d).onclick=async()=>{
+    if(busy)return;const dn=$('#bk-deck',d).value.trim();if(!dn){toast(t('Stapel angeben.'));$('#bk-deck',d).focus();return}
+    busy=true;$('#bk-ok',d).disabled=true;
+    try{
+      const type=ty(),dk=await ensureDeck(dn),all=($('#bk-tags',d).value||'').split(/[,;\s]+/).filter(Boolean);
+      const seen=new Set();if($('#bk-dup',d).checked)for(const c of S.cards.values())if(c.deck===dk.id)seen.add(norm(primaryText(c)));
+      const ups=[];let dup=0;
+      for(const it of d._items){const f=normFields(type,it.f),key=norm(type==='cloze'?plainCloze(f.text,-1,true):f.front);
+        if($('#bk-dup',d).checked&&seen.has(key)){dup++;continue}seen.add(key);
+        ups.push({noteId:uid(),create:true,patch:{type,deck:dk.id,fields:f,tags:[...new Set([...all,...it.tags])],atts:[],created:Date.now()}})}
+      for(let i=0;i<ups.length;i+=100)await applyNoteUpdates(ups.slice(i,i+100));
+      S.settings.lastNew={...(S.settings.lastNew||{}),type,deck:dk.name};await saveSettings();
+      d.close();toast(t('{0} Karten angelegt',ups.length)+(dup?' · '+t('{0} doppelte übersprungen',dup):''));done&&done();
+    }catch(e){toast(t('Speichern fehlgeschlagen. Bitte erneut versuchen.'));window.__errs.push({ts:Date.now(),m:'Bulk: '+String(e?.message||e).slice(0,300)})}
+    finally{busy=false;const b=$('#bk-ok',d);if(b)b.disabled=false}
+  };
+  setTimeout(()=>$('#bk-text',d).focus(),0);
+}
+
 /* ---------- Neuer Stapel ---------- */
 function openNewDeck(parentId){
   const par=parentId&&S.decks.get(parentId);
@@ -3059,7 +3164,7 @@ async function readJsonFile(file){
   return JSON.parse(await file.text());
 }
 /* ================= Diagnose, Druckansicht, Lernmotivation, Barrierefreiheit ================= */
-const APP_VER='4.7';
+const APP_VER='4.9';
 
 /* ---------- Diagnose ---------- */
 async function diagInfo(){
@@ -3818,6 +3923,8 @@ Object.assign(EN,{"Voreinstellungen":"Presets","Schnelltest":"Quick test","Stand
 Object.assign(EN,{"Vorschlag":"Suggestion","{0} von {1} Schlüsselbegriffen gefunden":"{0} of {1} key terms found","Fehlt":"Missing","Vorschläge übernehmen ({0})":"Accept suggestions ({0})","Antworten als KI-Bewertungs-Prompt kopieren":"Copy answers as AI grading prompt","Der Vorschlag vergleicht nur Schlüsselbegriffe – bitte prüfen.":"The suggestion only compares key terms – please review.","Vorschläge übernommen – bitte prüfen.":"Suggestions applied – please review.","Prompt kopiert – in ChatGPT, Claude oder ein lokales Modell einfügen.":"Prompt copied – paste it into ChatGPT, Claude or a local model.","Kopieren nicht möglich.":"Copying not possible.","Frage":"Question","Musterlösung":"Model answer","Antwort":"Answer","Bewerte die folgenden Prüfungsantworten streng, aber fair anhand der Musterlösung. Vergib je Frage 0 (falsch), 0,5 (teilweise richtig) oder 1 (richtig) und begründe in einem Satz. Antworte als Liste „Nr: Punkte – Begründung“.":"Grade the following exam answers strictly but fairly against the model answer. Give each question 0 (wrong), 0.5 (partly correct) or 1 (correct) and justify in one sentence. Reply as a list “No: points – reason”."});
 Object.assign(EN,{"Bewertung":"Grading","Verwerfen":"Discard","Ergebnis anzeigen":"Show result","Bewerte deine Freitext-Antworten anhand der Musterlösung. Danach wird das Ergebnis berechnet.":"Grade your free-text answers against the model answer. The result is calculated afterwards.","Vorschläge übernehmen":"Accept suggestions","offen":"open","bewertet":"graded","{0} / {1} bewertet":"{0} / {1} graded","Automatisch bewertete Fragen":"Automatically graded questions","{0} Fragen sind noch nicht bewertet und zählen 0 Punkte. Trotzdem Ergebnis anzeigen?":"{0} questions are not graded yet and count 0 points. Show the result anyway?"});
 Object.assign(EN,{"Kartentyp „{0}“ nicht bekannt – als „{1}“ erkannt.":"Card type “{0}” unknown – detected as “{1}”.","Kartentyp fehlte – als „{0}“ erkannt.":"Card type missing – detected as “{0}”.","Kartentyp „{0}“ als „{1}“ erkannt.":"Card type “{0}” recognised as “{1}”.","{0} Karten: Kartentyp automatisch erkannt (Details in der Liste).":"{0} cards: card type detected automatically (details in the list).","Ziel-Stapel":"Target deck","Wie in der Datei":"As in the file","Neuer Stapel…":"New deck…","Name, z. B. Krypto::AES":"Name, e.g. Crypto::AES","Name des neuen Stapels":"Name of the new deck","Gilt für neue Karten. Bereits vorhandene Karten behalten ihren Stapel.":"Applies to new cards. Existing cards keep their deck.","Bitte einen Namen für den neuen Stapel eingeben.":"Please enter a name for the new deck.","Nicht erkannte Kartentypen: {0}":"Unrecognised card types: {0}"});
+Object.assign(EN,{"Speichern & weitere Karte":"Save & add another"});
+Object.assign(EN,{"Mehrfach-Modus":"Multi-card mode","Nach dem Speichern bleibt das Fenster offen, die Felder werden geleert – Stapel, Typ und Tags bleiben.":"The window stays open after saving and the fields are cleared – deck, type and tags stay.","{0} angelegt":"{0} created","Aus Tabelle":"From table","Mehrere Karten aus Excel/Calc einfügen":"Paste many cards from Excel/Calc","Karten aus Tabelle einfügen":"Create cards from a table","Zellen in Excel/Calc markieren, kopieren (Strg+C) und unten einfügen. Jede Zeile wird eine Karte, jede Spalte ein Feld.":"Select cells in Excel/Calc, copy (Ctrl+C) and paste below. Each row becomes a card, each column a field.","Tags für alle (optional)":"Tags for all (optional)","Tabelle":"Table","Hier einfügen (Strg+V) …":"Paste here (Ctrl+V) …","Erste Zeile ist Überschrift":"First row is a header","Doppelte überspringen":"Skip duplicates","Spalten zuordnen":"Assign columns","Spalte {0}":"Column {0}","ignorieren":"ignore","Vorderseite":"Front","Rückseite":"Back","Text mit Lücken":"Text with blanks","Antwortoptionen":"Answer options","Zusatz":"Extra","Quelle":"Source","{0} weitere Zeilen":"{0} more rows","{0} Karten bereit":"{0} cards ready","{0} Zeilen werden übersprungen":"{0} rows will be skipped","Karten anlegen":"Create cards","{0} Karten anlegen":"Create {0} cards","{0} Karten angelegt":"{0} cards created","{0} doppelte übersprungen":"{0} duplicates skipped","keine Lücke {{c1::…}}":"no blank {{c1::…}}","Frage fehlt":"question missing","weniger als 2 Optionen":"fewer than 2 options","keine richtige Option (*)":"no correct option (*)","Vorder- oder Rückseite fehlt":"front or back missing","Vorderseite fehlt":"front missing"});
 /* ---------- Start ---------- */
 loadAll().then(()=>{
   LANG=S.settings.lang||(/^de/i.test(navigator.language||'de')?'de':'en');
