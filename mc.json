@@ -1,0 +1,11 @@
+{
+  "id": "enc-mc-001",
+  "type": "mc",
+  "deck": "Encryption::Examples",
+  "fields": {
+    "front": "Which of these are **symmetric** algorithms? (multiple answers)",
+    "options": "*AES\n*ChaCha20\nRSA\nECDSA",
+    "extra": "RSA and ECDSA are asymmetric."
+  },
+  "tags": ["basics"]
+}
