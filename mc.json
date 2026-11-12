@@ -1,11 +1,140 @@
 {
-  "id": "enc-mc-001",
-  "type": "mc",
-  "deck": "Encryption::Examples",
-  "fields": {
-    "front": "Which of these are **symmetric** algorithms? (multiple answers)",
-    "options": "*AES\n*ChaCha20\nRSA\nECDSA",
-    "extra": "RSA and ECDSA are asymmetric."
+  "format": "karteikarten",
+  "version": 2,
+  "package": {
+    "course": "Encryption – multiple choice examples (EN)",
+    "version": "1"
   },
-  "tags": ["basics"]
+  "notes": [
+    {
+      "id": "enc-mc-ex-001",
+      "type": "mc",
+      "deck": "Encryption::MC",
+      "fields": {
+        "front": "Which of these are **symmetric** algorithms? (multiple answers)",
+        "options": "*AES\n*ChaCha20\n*3DES\nRSA",
+        "extra": "RSA is asymmetric; AES, ChaCha20 and 3DES use one shared key."
+      },
+      "tags": [
+        "basics"
+      ]
+    },
+    {
+      "id": "enc-mc-ex-002",
+      "type": "mc",
+      "deck": "Encryption::MC",
+      "fields": {
+        "front": "Which properties does an **AEAD** mode such as AES-GCM provide? (multiple answers)",
+        "options": "*Confidentiality\n*Integrity\n*Authenticity of associated data\nKey exchange",
+        "extra": "AEAD combines encryption and authentication. It does not exchange keys."
+      },
+      "tags": [
+        "modes"
+      ]
+    },
+    {
+      "id": "enc-mc-ex-003",
+      "type": "mc",
+      "deck": "Encryption::MC",
+      "fields": {
+        "front": "Which hash functions are considered **broken** for collision resistance? (multiple answers)",
+        "options": "*MD5\n*SHA-1\nSHA-256\nSHA-3",
+        "extra": "Practical collisions are known for MD5 (2004) and SHA-1 (2017, SHAttered)."
+      },
+      "tags": [
+        "hash"
+      ]
+    },
+    {
+      "id": "enc-mc-ex-004",
+      "type": "mc",
+      "deck": "Encryption::MC",
+      "fields": {
+        "front": "Which of these are **asymmetric** algorithms? (multiple answers)",
+        "options": "*RSA\n*ECDSA\n*Diffie–Hellman\nAES",
+        "extra": "Asymmetric schemes use key pairs or public parameters."
+      },
+      "tags": [
+        "basics"
+      ]
+    },
+    {
+      "id": "enc-mc-ex-005",
+      "type": "mc",
+      "deck": "Encryption::MC",
+      "fields": {
+        "front": "Which measures help against **rainbow-table** attacks on stored passwords? (multiple answers)",
+        "options": "*A unique random salt per password\n*A slow password hash such as Argon2 or bcrypt\nStoring passwords with plain SHA-256\nEncrypting the password database with ECB",
+        "extra": "Salts defeat precomputed tables; slow hashes make guessing expensive."
+      },
+      "tags": [
+        "hash"
+      ]
+    },
+    {
+      "id": "enc-mc-ex-006",
+      "type": "mc",
+      "deck": "Encryption::MC",
+      "fields": {
+        "front": "What is the main weakness of **ECB** mode?",
+        "options": "*Identical plaintext blocks give identical ciphertext blocks\nIt requires a very long key\nIt cannot encrypt more than one block\nIt is slower than CBC",
+        "extra": "The ECB penguin is the classic demonstration."
+      },
+      "tags": [
+        "modes"
+      ]
+    },
+    {
+      "id": "enc-mc-ex-007",
+      "type": "mc",
+      "deck": "Encryption::MC",
+      "fields": {
+        "front": "Which key length gives AES the **highest** security level?",
+        "options": "128 bit\n192 bit\n*256 bit\n512 bit",
+        "extra": "AES supports only 128, 192 and 256 bit keys; there is no 512-bit AES."
+      },
+      "tags": [
+        "aes"
+      ]
+    },
+    {
+      "id": "enc-mc-ex-008",
+      "type": "mc",
+      "deck": "Encryption::MC",
+      "fields": {
+        "front": "Which mode of operation provides **authenticated encryption**?",
+        "options": "ECB\nCBC\nCTR\n*GCM",
+        "extra": "CBC and CTR give confidentiality only; GCM adds an authentication tag."
+      },
+      "tags": [
+        "modes"
+      ]
+    },
+    {
+      "id": "enc-mc-ex-009",
+      "type": "mc",
+      "deck": "Encryption::MC",
+      "fields": {
+        "front": "In RSA, which value must be kept **secret**?",
+        "options": "The modulus n\nThe public exponent e\n*The private exponent d\nThe ciphertext c",
+        "extra": "n and e form the public key; d (and the primes p, q) must stay secret."
+      },
+      "tags": [
+        "rsa"
+      ]
+    },
+    {
+      "id": "enc-mc-ex-010",
+      "type": "mc",
+      "deck": "Encryption::MC",
+      "fields": {
+        "front": "What does the **Diffie–Hellman** key exchange security rely on?",
+        "options": "*The discrete logarithm problem\nThe difficulty of factoring large numbers\nThe secrecy of the public values\nThe length of the plaintext",
+        "extra": "Factoring is the basis of RSA, not of Diffie–Hellman."
+      },
+      "tags": [
+        "dh"
+      ]
+    }
+  ]
 }
