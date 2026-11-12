@@ -2471,11 +2471,13 @@ function csvToNotes(text,pool){
   return notes;
 }
 function jsonToParsed(j,pool){
+  if(Array.isArray(j))j={notes:j};
   const P={package:j.package||null,models:j.models||[],origin:j.origin||null,partial:!!j.partial,notes:[],decks:j.decks||[],log:j.log||null,settings:j.settings||null};
   const attOf=a=>{const o={name:String(a.name||'').split(/[\\/]/).pop(),type:a.type||guessType(a.name||''),size:a.size,side:a.side||'back',id:a.id,osize:a.osize};
     if(a.data){o.data=a.data;o.size=o.size||Math.floor(a.data.length*3/4)}else{const f=(a.file&&pool.get(norm(a.file)))||pool.get(norm(a.name));if(f){o.blob=f;o.size=o.size||f.size}}return o};
-  if(j.version>=2||j.notes){
-    for(const n of j.notes||[])P.notes.push({...n,deck:n.deck||'Importiert',fields:n.fields||{},tags:n.tags||[],aliases:n.aliases||[],atts:(n.atts||[]).map(attOf)});
+  if(Array.isArray(j))j={notes:j};
+  if(j.version>=2||j.notes||(Array.isArray(j.cards)&&j.cards.some(c=>c&&(c.fields||c.type)))){
+    for(const n of j.notes||j.cards||[])P.notes.push({...n,deck:n.deck||'Importiert',fields:(n.fields&&typeof n.fields==='object')?n.fields:undefined,tags:n.tags||[],aliases:n.aliases||[],atts:(n.atts||[]).map(attOf)});
   }else{ // v1: Karten mit front/back
     const st=new Map((j.states||[]).map(s=>[s.id,s]));
     for(const c of j.cards||[])P.notes.push({id:c.id,type:'basic',deck:c.deck||'Importiert',fields:{front:c.front||'',back:c.back||''},tags:c.tags||[],aliases:[],
@@ -2643,20 +2645,31 @@ function showImport(P,plan,warn){
   <div class="stats"><div class="stat"><b>${cnt('new')}</b><span class="mut">${t('Neu')}</span></div><div class="stat"><b>${cnt('update')}</b><span class="mut">${t('Aktualisiert')}</span></div>
    <div class="stat"><b>${cnt('conflict')}</b><span class="mut">${t('Konflikte')}</span></div><div class="stat"><b>${plan.rows.filter(r=>r.quiet).length}</b><span class="mut">${t('Unverändert')}</span></div><div class="stat"><b>${plan.miss.length}</b><span class="mut">${t('Fehlen in Datei')}</span></div></div>
   ${warn.errors||warn.hints?`<div class="warn">${warn.errors?`⛔ ${t('{0} Karten mit Fehlern – sie sind abgewählt (Haken setzen, um sie trotzdem zu importieren).',warn.errors)} `:''}${warn.hints?`⚠ ${t('{0} Karten mit Hinweisen.',warn.hints)}`:''}</div>`:''}
-  ${warn.blockedAtts||warn.skipped?`<div class="warn">⚠ ${t('{0} Anhänge blockiert (HTML/SVG/Skripte/zu groß), {1} Karten übersprungen.',warn.blockedAtts,warn.skipped)}</div>`:''}
+  ${warn.fixed?`<div class="warn">ℹ ${t('{0} Karten: Kartentyp automatisch erkannt (Details in der Liste).',warn.fixed)}</div>`:''}
+  <div class="box" style="margin:10px 0"><label for="im-deck" style="margin-top:0">${t('Ziel-Stapel')}</label>
+    <div class="flex"><select id="im-deck" class="grow"><option value="">${t('Wie in der Datei')} (${[...new Set(P.notes.map(n=>n.deck))].length} ${t('Stapel')})</option><option value="__new">＋ ${t('Neuer Stapel…')}</option>${deckOpts('',false)}</select>
+    <input id="im-newdeck" hidden class="grow" maxlength="120" placeholder="${esc(t('Name, z. B. Krypto::AES'))}" aria-label="${esc(t('Name des neuen Stapels'))}"></div>
+    <div class="small mut" style="margin-top:4px">${t('Gilt für neue Karten. Bereits vorhandene Karten behalten ihren Stapel.')}</div></div>
+  ${warn.blockedAtts||warn.skipped?`<div class="warn">⚠ ${t('{0} Anhänge blockiert (HTML/SVG/Skripte/zu groß), {1} Karten übersprungen.',warn.blockedAtts,warn.skipped)}${warn.badTypes&&warn.badTypes.length?` ${t('Nicht erkannte Kartentypen: {0}',[...new Set(warn.badTypes)].slice(0,6).join(', '))}`:''}</div>`:''}
   ${P.notes.some(n=>(n.atts||[]).some(a=>/^image\/(png|jpeg|webp|bmp)/.test(a.type||'')))?`<label class="inl"><input type="checkbox" id="im-shrink" ${S.settings.shrink===false?'':'checked'}> ${t('Große Bilder verkleinern (max. 1600 px)')}</label>`:''}
   ${hasStates?`<label>${t('Lernstatus aus der Datei')}</label><select id="im-state"><option value="new">${t('Nur für neue Karten übernehmen')}</option><option value="never">${t('Nie übernehmen')}</option><option value="always">${t('Immer übernehmen (überschreibt)')}</option></select>`:''}
   ${plan.miss.length?`<label>${t('Karten, die der Dozent aus der Datei entfernt hat')}</label><select id="im-miss"><option value="keep">${t('Behalten')}</option><option value="suspend">${t('Aussetzen')}</option><option value="delete">${t('Löschen')}</option></select>`:''}
   <div style="max-height:46vh;overflow:auto;margin-top:10px"><table>${shown.slice(0,300).map((r,i)=>`<tr><td><input type="checkbox" data-i="${plan.rows.indexOf(r)}" class="im-inc" ${r.inc?'checked':''}></td>
     <td><span class="st ${r.status==='new'?'new':r.status==='update'?'review':'learning'}">${t(r.status==='new'?'Neu':r.status==='update'?'Update':'Konflikt')}</span></td>
-    <td>${esc(r.n.deck)}</td><td>${r.ex?fieldDiffHTML(r):esc(summaryOf(r.n.type,r.n.fields,0).front.slice(0,120))}${r.n._check?`<div class="warn">${r.n._check.lvl==='error'?'⛔':'⚠'} ${esc(r.n._check.msg)}</div>`:''}
+    <td class="im-dk" data-i="${plan.rows.indexOf(r)}">${esc(r.n.deck)}</td><td><span class="chip">${esc(typeLabel(r.n.type))}</span></td><td>${r.ex?fieldDiffHTML(r):esc(summaryOf(r.n.type,r.n.fields,0).front.slice(0,120))}${r.n._check?`<div class="warn">${r.n._check.lvl==='error'?'⛔':'⚠'} ${esc(r.n._check.msg)}</div>`:''}
     ${r.status==='conflict'?`<div class="warn">${t('Du hast diese Karte lokal geändert.')} <select data-c="${plan.rows.indexOf(r)}" class="im-ch"><option value="local">${t('Meine Version behalten')}</option><option value="theirs">${t('Neue Version übernehmen')}</option></select></div>`:''}</td></tr>`).join('')}</table>
     ${shown.length>300?`<div class="mut small">${t('… und {0} weitere (werden mit importiert)',shown.length-300)}</div>`:''}</div>
   <div class="flex" style="margin-top:16px;justify-content:flex-end"><button id="im-c">${t('Abbrechen')}</button><button class="pri" id="im-go">${t('Importieren')}</button></div>`;
   $$('.im-inc',d).forEach(c=>c.onchange=()=>{plan.rows[+c.dataset.i].inc=c.checked});
   $$('.im-ch',d).forEach(c=>c.onchange=()=>{plan.rows[+c.dataset.c].choice=c.value});
+  const targetDeck=()=>{const v=$('#im-deck',d).value;if(v==='')return '';if(v==='__new')return $('#im-newdeck',d).value.trim().replace(/\s*::\s*/g,'::').replace(/^:+|:+$/g,'');const dk=S.decks.get(v);return dk?dk.name:''};
+  const showTarget=()=>{const nd=$('#im-deck',d).value==='__new';$('#im-newdeck',d).hidden=!nd;if(nd)$('#im-newdeck',d).focus();
+    const tg=targetDeck();$$('.im-dk',d).forEach(td=>{const r=plan.rows[+td.dataset.i];td.textContent=(tg&&r.status==='new')?tg:r.n.deck})};
+  $('#im-deck',d).onchange=showTarget;$('#im-newdeck',d).oninput=showTarget;
   $('#im-c',d).onclick=()=>d.close();
   $('#im-go',d).onclick=async()=>{
+    const tg=targetDeck();if($('#im-deck',d).value==='__new'&&!tg){toast(t('Bitte einen Namen für den neuen Stapel eingeben.'));$('#im-newdeck',d).focus();return}
+    if(tg)plan.rows.forEach(r=>{if(r.status==='new')r.n.deck=tg});
     const mp=$('#im-miss',d);if(mp)plan.miss.forEach(m=>m.policy=mp.value);
     const o={stateMode:$('#im-state',d)?$('#im-state',d).value:'never',shrink:$('#im-shrink',d)?$('#im-shrink',d).checked:false};
     if($('#im-shrink',d)){S.settings.shrink=o.shrink;saveSettings()}
@@ -2765,13 +2778,58 @@ function renderIO(){
 /* ================= Sicherheit: Sanitize, Verschlüsselung, Schnappschüsse, Medien ================= */
 const BAD_MIME=/html|xml|javascript|ecmascript|svg|x-sh|x-msdownload|executable|java-archive|x-msi|x-bat|powershell/i;
 const BAD_EXT=/\.(html?|xhtml|svg|svgz|js|mjs|hta|exe|dll|bat|cmd|ps1|vbs|jar|msi|scr|com|sh|lnk)$/i;
+/* ---- Kartentyp & Felder tolerant erkennen (KI-/Fremdformate) ---- */
+const nkey=x=>String(x??'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/ß/g,'ss').replace(/[^a-z0-9]+/g,'');
+const TYPE_ALIAS=(()=>{const m={};const add=(ty,l)=>l.split(' ').forEach(k=>m[k]=ty);
+  add('basic','basic einfach standard simple qa frageantwort card karte karteikarte flashcard normal question');
+  add('reversed','reversed beidseitig basicandreversedcard basicreversed reverse twoway zweiseitig bidirectional umkehrbar');
+  add('cloze','cloze lueckentext luckentext clozedeletion fillintheblank fillblank gap luecke lueckentexte');
+  add('typein','typein typeintheanswer eintippen typed basictypinganswer basictypeinganswer input tippen');
+  add('mc','mc mcq multiplechoice multichoice choice auswahl quiz singlechoice multipleselect');
+  add('occlusion','occlusion imageocclusion bildverdeckung bildverdeckungen imageocclusionenhanced verdeckung');
+  add('calc','calc calculation rechenaufgabe rechnen math formel berechnung');return m})();
+const FIELD_ALIAS=(()=>{const m={};const add=(k,l)=>l.split(' ').forEach(x=>m[x]=k);
+  add('front','front vorderseite frage question q prompt term begriff');add('back','back rueckseite antwort answer a solution loesung definition');
+  add('text','text lueckentext cloze');add('options','options optionen choices antwortmoeglichkeiten answers antworten');
+  add('extra','extra zusatz hint hinweis notes notizen explanation erklaerung');add('source','source quelle reference');
+  add('vars','vars variables variablen');add('image','image bild');add('masks','masks masken');return m})();
+function fixNote(n,pm){
+  if(!n||typeof n!=='object')return false;
+  // Felder: fehlen sie, die bekannten Schlüssel der obersten Ebene verwenden
+  if(!n.fields||typeof n.fields!=='object'||Array.isArray(n.fields)){
+    const f={};for(const k of Object.keys(n)){const a=FIELD_ALIAS[nkey(k)];if(a&&typeof n[k]!=='object')f[a]=n[k]}
+    n.fields=f}
+  const raw=n.type,k=nkey(raw),note=[];let ty=null;
+  const mods=[...(pm||[]),...models()];
+  if(typeof raw==='string'&&TYPES.includes(raw))ty=raw;
+  else if(typeof raw==='string'&&modelOf(raw))ty=raw;
+  else if(k&&TYPE_ALIAS[k])ty=TYPE_ALIAS[k];
+  else if(k){const m=mods.find(x=>nkey(x.id)===k||nkey(x.name)===k||('m'+nkey(x.id))===k);if(m)ty='m:'+m.id}
+  const had=ty;
+  const m0=ty&&modelOf(ty);
+  if(!m0){ // Feldnamen auf Standardschlüssel abbilden
+    const f={...n.fields};for(const key of Object.keys(n.fields)){const a=FIELD_ALIAS[nkey(key)];if(a&&f[a]===undefined)f[a]=n.fields[key]}n.fields=f}
+  const f=n.fields,has=x=>f[x]!==undefined&&String(typeof f[x]==='string'?f[x]:'x').trim()!=='';
+  if(!ty){ // aus den Feldern ableiten
+    if((has('image')||Array.isArray(f.masks))&&Array.isArray(f.masks)&&f.masks.length)ty='occlusion';
+    else if(has('vars')&&has('answer')&&has('front'))ty='calc';
+    else if(has('options'))ty='mc';
+    else if(has('text')&&!has('front'))ty='cloze';
+    else if(has('front')&&/\{\{c\d+::/.test(String(f.front))&&!has('back'))ty='cloze';
+    else if(has('front')||has('back'))ty='basic';
+    if(ty)note.push(raw?t('Kartentyp „{0}“ nicht bekannt – als „{1}“ erkannt.',String(raw),t(TYPE_LABEL[ty]||ty)):t('Kartentyp fehlte – als „{0}“ erkannt.',t(TYPE_LABEL[ty]||ty)))}
+  if(ty==='cloze'&&!has('text')&&has('front')){f.text=f.front;delete f.front}
+  if(ty){n.type=ty;if(note.length)n._typeNote=note.join(' ');return true}
+  return false;
+}
 function sanitizeParsed(P){
   const w={blockedAtts:0,skipped:0};
   if(P.notes.length>200000){w.skipped+=P.notes.length-200000;P.notes.length=200000}
   const out=[];
   for(const n of P.notes){
-    if(!n||typeof n!=='object'||typeof n.fields!=='object'){w.skipped++;continue}
-    if(!(TYPES.includes(n.type)||modelOf(n.type))){w.skipped++;continue}
+    if(!n||typeof n!=='object'){w.skipped++;continue}
+    fixNote(n,P.models);
+    if(typeof n.fields!=='object'||!(TYPES.includes(n.type)||modelOf(n.type))){w.skipped++;(w.badTypes=w.badTypes||[]).push(String(n.type??'–'));continue}
     let big=false;for(const k in n.fields){const v=n.fields[k];if(typeof v==='string'&&v.length>100000)big=true;if(k==='masks'&&(!Array.isArray(v)||v.length>200||v.some(m=>!Array.isArray(m)||m.length!==4||m.some(x=>!(x>=0&&x<=1)))))big=true}
     if(big){w.skipped++;continue}
     n.id=String(n.id||uid()).slice(0,100);n.deck=String(n.deck||'Importiert').slice(0,200);
@@ -2785,7 +2843,7 @@ function sanitizeParsed(P){
     }
     n.atts=keep;out.push(n);
   }
-  P.notes=out;w.errors=0;w.hints=0;checkNotes(P.notes,w);return w;
+  P.notes=out;w.errors=0;w.hints=0;checkNotes(P.notes,w);w.fixed=out.filter(n=>n._typeNote).length;return w;
 }
 /* Inhaltsprüfung für importierte Notizen (z. B. KI-generierte Dateien): Fehler werden in der Vorschau abgewählt, Hinweise nur angezeigt. */
 function checkNotes(notes,w){
@@ -2809,6 +2867,7 @@ function checkNotes(notes,w){
         if(bad===40)err.push(t('Rechenaufgabe nicht lösbar: {0}',last));else if(bad)hint.push(t('Rechenaufgabe scheitert bei {0} % der Zufallswerte ({1}).',Math.round(bad*100/40),last));break}
       default:{const m=modelOf(n.type);if(m&&!m.fields.some(k=>s(f[k])))err.push(t('Alle Felder der Vorlage sind leer.'))}
     }
+    if(n._typeNote)hint.push(n._typeNote);
     n._check=err.length?{lvl:'error',msg:err.join(' ')}:hint.length?{lvl:'hint',msg:hint.join(' ')}:null;
     if(err.length)w.errors++;else if(hint.length)w.hints++;
   }
@@ -3000,7 +3059,7 @@ async function readJsonFile(file){
   return JSON.parse(await file.text());
 }
 /* ================= Diagnose, Druckansicht, Lernmotivation, Barrierefreiheit ================= */
-const APP_VER='4.6';
+const APP_VER='4.7';
 
 /* ---------- Diagnose ---------- */
 async function diagInfo(){
@@ -3758,6 +3817,7 @@ Object.assign(EN,{"Neuer Stapel":"New deck","z. B. AES":"e.g. AES","Übergeordne
 Object.assign(EN,{"Voreinstellungen":"Presets","Schnelltest":"Quick test","Standard":"Standard","Vollklausur":"Full exam","Fragearten":"Question types","Verfügbare Fragen":"Available questions","Eintippen":"Typed answer","Rechenaufgabe":"Calculation","Freitext":"Free text","Mehrfachauswahl":"Multiple selection","Einfachauswahl":"Single selection","Verlauf":"History","Noch keine Klausur absolviert.":"No exam taken yet.","Prüfungstermin in {0} Tagen":"Exam in {0} days","Prüfungstermin ist heute":"Exam is today","Gleiche Klausur wiederholen":"Repeat same exam","Beenden":"Close","Tastatur: ← → blättern · M markieren · 1–9 Antwort wählen":"Keyboard: ← → navigate · M flag · 1–9 choose answer","Klausur läuft – bitte erst abgeben oder abbrechen.":"Exam in progress – submit or cancel it first.","Einstellungen":"Settings"});
 Object.assign(EN,{"Vorschlag":"Suggestion","{0} von {1} Schlüsselbegriffen gefunden":"{0} of {1} key terms found","Fehlt":"Missing","Vorschläge übernehmen ({0})":"Accept suggestions ({0})","Antworten als KI-Bewertungs-Prompt kopieren":"Copy answers as AI grading prompt","Der Vorschlag vergleicht nur Schlüsselbegriffe – bitte prüfen.":"The suggestion only compares key terms – please review.","Vorschläge übernommen – bitte prüfen.":"Suggestions applied – please review.","Prompt kopiert – in ChatGPT, Claude oder ein lokales Modell einfügen.":"Prompt copied – paste it into ChatGPT, Claude or a local model.","Kopieren nicht möglich.":"Copying not possible.","Frage":"Question","Musterlösung":"Model answer","Antwort":"Answer","Bewerte die folgenden Prüfungsantworten streng, aber fair anhand der Musterlösung. Vergib je Frage 0 (falsch), 0,5 (teilweise richtig) oder 1 (richtig) und begründe in einem Satz. Antworte als Liste „Nr: Punkte – Begründung“.":"Grade the following exam answers strictly but fairly against the model answer. Give each question 0 (wrong), 0.5 (partly correct) or 1 (correct) and justify in one sentence. Reply as a list “No: points – reason”."});
 Object.assign(EN,{"Bewertung":"Grading","Verwerfen":"Discard","Ergebnis anzeigen":"Show result","Bewerte deine Freitext-Antworten anhand der Musterlösung. Danach wird das Ergebnis berechnet.":"Grade your free-text answers against the model answer. The result is calculated afterwards.","Vorschläge übernehmen":"Accept suggestions","offen":"open","bewertet":"graded","{0} / {1} bewertet":"{0} / {1} graded","Automatisch bewertete Fragen":"Automatically graded questions","{0} Fragen sind noch nicht bewertet und zählen 0 Punkte. Trotzdem Ergebnis anzeigen?":"{0} questions are not graded yet and count 0 points. Show the result anyway?"});
+Object.assign(EN,{"Kartentyp „{0}“ nicht bekannt – als „{1}“ erkannt.":"Card type “{0}” unknown – detected as “{1}”.","Kartentyp fehlte – als „{0}“ erkannt.":"Card type missing – detected as “{0}”.","Kartentyp „{0}“ als „{1}“ erkannt.":"Card type “{0}” recognised as “{1}”.","{0} Karten: Kartentyp automatisch erkannt (Details in der Liste).":"{0} cards: card type detected automatically (details in the list).","Ziel-Stapel":"Target deck","Wie in der Datei":"As in the file","Neuer Stapel…":"New deck…","Name, z. B. Krypto::AES":"Name, e.g. Crypto::AES","Name des neuen Stapels":"Name of the new deck","Gilt für neue Karten. Bereits vorhandene Karten behalten ihren Stapel.":"Applies to new cards. Existing cards keep their deck.","Bitte einen Namen für den neuen Stapel eingeben.":"Please enter a name for the new deck.","Nicht erkannte Kartentypen: {0}":"Unrecognised card types: {0}"});
 /* ---------- Start ---------- */
 loadAll().then(()=>{
   LANG=S.settings.lang||(/^de/i.test(navigator.language||'de')?'de':'en');
